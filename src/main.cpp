@@ -14,6 +14,8 @@
 hw_timer_t *setTimer = NULL;
 
 uint16_t setFreq = 1;
+uint16_t saveFreq = 1;
+
 uint8_t preScaler = 80;
 
 uint16_t potValue;
@@ -25,8 +27,9 @@ uint32_t timerPeriod = timerFrequency / setFreq;
 WiFiUDP udp;
 
 bool sendFlag = false;
-const int bufferSize = 256;
+const int bufferSize = 700;
 char incomingPacket[bufferSize];
+
 int packetCount = 0;
 
 
@@ -67,26 +70,56 @@ void setup() {
 void loop() {
 
   potValue = analogRead(POT_PIN);
-  setFreq = map(potValue, 0, 4095, 1, 100);
+  setFreq = map(potValue, 0, 4095, 1, 550);
 
   timerPeriod = timerFrequency / setFreq;
 
   timerAlarmWrite(setTimer, timerPeriod, true);
   timerAlarmEnable(setTimer);
   
-  flexValue = analogRead(FLEX_PIN);
-  // flexValue = map(analogRead(FLEX_PIN), 0, 4095, 0, 100);
+  // flexValue = analogRead(FLEX_PIN);
+  flexValue = map(analogRead(FLEX_PIN), 0, 4095, 0, 550);
+
+    // Serial.print(">f:");
+    // Serial.println(flexValue);
+    
+    // Serial.print(">Freq:");
+    // Serial.println(setFreq);
+
 
   if (sendFlag) {
-    // unsigned long currentMicros = micros();
-    // timerF = 1000000 / (currentMicros - previousMicros);
-    // previousMicros = currentMicros;
 
-    int charsWritten = snprintf(incomingPacket + strlen(incomingPacket), bufferSize - strlen(incomingPacket), "%s;%u;%u", (packetCount == 0 ? "" : ","), flexValue, potValue);
-    Serial.println(incomingPacket);
+    int charsWritten = snprintf(incomingPacket + strlen(incomingPacket), bufferSize - strlen(incomingPacket), "%s%u;%u", (packetCount == 0 ? "" : "/"), flexValue, setFreq);
 
-    // snprintf(incomingPacket, bufferSize, "%u;%u", flexValue, potValue);
-    // sendToPython(incomingPacket);
+    if (charsWritten >= 0 && charsWritten < bufferSize - strlen(incomingPacket))
+      packetCount++;
+
+    if(setFreq >= 70)
+      saveFreq = 70;
+    else
+      saveFreq = setFreq;
+
+    // Serial.print(">flexValue:");
+    // Serial.println(flexValue);
+    
+    // Serial.print(">Freq:");
+    // Serial.println(setFreq);
+
+    if (packetCount >= saveFreq) {
+      // unsigned long currentMicros = micros();
+      // timerF = 1000000 / (currentMicros - previousMicros);
+      // previousMicros = currentMicros;
+      Serial.printf("FrequênciaEstimada: %u || ", timerF);
+      Serial.printf("FrequênciaDefinida: %u || ", setFreq);
+      Serial.printf("PacketCount: %i || ", packetCount);
+      Serial.printf(incomingPacket);
+      Serial.println(" ");
+
+      sendToPython(incomingPacket);
+      incomingPacket[0] = '\0';
+      packetCount = 0;
+    
+    }
     sendFlag = false;
   }
 }
